@@ -1,6 +1,6 @@
 import asyncio
+import random
 from collections.abc import Awaitable, Callable
-
 
 class CatchQueue:
     def __init__(self) -> None:
@@ -26,6 +26,10 @@ class CatchQueue:
                 print(f"[Queue] Task failed: {exc}")
             finally:
                 self._queue.task_done()
+                
+            # Random human pause between back-to-back catches
+            if not self._queue.empty():
+                await asyncio.sleep(random.uniform(0.3, 0.8))
 
     def empty(self) -> bool:
         return self._queue.empty()
