@@ -132,8 +132,32 @@ async def on_message(message: discord.Message) -> None:
                 print("🛑 Aborted sending message because script was paused mid-type.")
                 return
 
+            # Send the catch command
             await message.channel.send(final_message)
             print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
+
+            # ---------------------------------------------------------
+            # NEW: 30% chance to send a casual follow-up message
+            # ---------------------------------------------------------
+            if random.random() < 0.30:
+                follow_up_msgs = ["nice", "ok", "shine", "shine when", "gg"]
+                chosen_msg = random.choice(follow_up_msgs)
+                
+                # Human delay before starting to type the follow-up (1 to 3 seconds)
+                reaction_delay = random.uniform(1.0, 3.0)
+                await asyncio.sleep(reaction_delay)
+                
+                # Double check pause again in case a captcha popped up instantly after catching
+                if is_paused or is_afk:
+                    return
+
+                # Simulate typing the short message
+                msg_typing_delay = len(chosen_msg) * random.uniform(0.04, 0.08)
+                async with message.channel.typing():
+                    await asyncio.sleep(msg_typing_delay)
+                
+                await message.channel.send(chosen_msg)
+                print(f"💬 [Stealth] Sent follow-up message: '{chosen_msg}'")
 
         await catch_queue.add(process_notification)
 
