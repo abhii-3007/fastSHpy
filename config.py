@@ -1,0 +1,14 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
+
+POKETWO_BOT_ID = 716390085896962058
+
+HELPER_BOT_IDS = {
+    1307910235737948252,
+    1411516692781072434,
+    854233015475109888,
+}
