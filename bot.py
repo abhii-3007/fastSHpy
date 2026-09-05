@@ -14,6 +14,10 @@ catch_queue = CatchQueue()
 is_paused = False
 is_afk = False
 
+# --- NEW: Smart Miss Counter Variables ---
+ping_counter = 0
+next_miss_target = random.randint(10, 15)
+
 async def afk_timer(afk_seconds: int) -> None:
     global is_afk
     print(f"🚶 [Stealth] Taking a bathroom break. AFK for {int(afk_seconds / 60)} minutes.")
@@ -24,11 +28,12 @@ async def afk_timer(afk_seconds: int) -> None:
 @bot.event
 async def on_ready() -> None:
     print(f"Logged in as {bot.user} - Ultimate Stealth Mode + Async Queue Active.")
+    print(f"🎯 [Stealth] Next forced miss is scheduled in {next_miss_target} pings.")
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
-    global is_paused
-    global is_afk
+    global is_paused, is_afk
+    global ping_counter, next_miss_target
 
     msg_content = message.content.strip().lower()
 
@@ -69,11 +74,21 @@ async def on_message(message: discord.Message) -> None:
     # 3. Helper-bot notification & Catching Logic
     if message.author.id in HELPER_BOT_IDS and str(bot.user.id) in message.content:
         
-        # Simulated misses & AFK
-        if random.random() < 0.05:
-            print("🙈 [Stealth] Simulated human error: Ignored this ping.")
+        # ---------------------------------------------------------
+        # NEW: Smart 1-in-10-to-15 Miss Logic
+        # ---------------------------------------------------------
+        ping_counter += 1
+        
+        if ping_counter >= next_miss_target:
+            print(f"🙈 [Stealth] Simulated human error: Ignored ping #{ping_counter}.")
+            
+            # Reset counter and pick a new target for the next miss
+            ping_counter = 0
+            next_miss_target = random.randint(10, 15)
+            print(f"🎯 [Stealth] Next forced miss is scheduled in {next_miss_target} pings.")
             return
 
+        # 2% chance to go AFK for 10-20 minutes
         if random.random() < 0.02:
             is_afk = True
             afk_seconds = random.randint(600, 1200) # 10 to 20 minutes
@@ -85,7 +100,7 @@ async def on_message(message: discord.Message) -> None:
         if not pokemon_name:
             return
 
-        print(f"\n📥 Ping for {pokemon_name} added to the queue.")
+        print(f"\n📥 Ping {ping_counter}/{next_miss_target} added to the queue: {pokemon_name}")
 
         async def process_notification() -> None:
             if is_paused or is_afk:
@@ -136,9 +151,7 @@ async def on_message(message: discord.Message) -> None:
             await message.channel.send(final_message)
             print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
 
-            # ---------------------------------------------------------
-            # NEW: 30% chance to send a casual follow-up message
-            # ---------------------------------------------------------
+            # 30% chance to send a casual follow-up message
             if random.random() < 0.30:
                 follow_up_msgs = ["nice", "ok", "shine", "shine when", "gg"]
                 chosen_msg = random.choice(follow_up_msgs)
@@ -147,11 +160,9 @@ async def on_message(message: discord.Message) -> None:
                 reaction_delay = random.uniform(1.0, 3.0)
                 await asyncio.sleep(reaction_delay)
                 
-                # Double check pause again in case a captcha popped up instantly after catching
                 if is_paused or is_afk:
                     return
 
-                # Simulate typing the short message
                 msg_typing_delay = len(chosen_msg) * random.uniform(0.04, 0.08)
                 async with message.channel.typing():
                     await asyncio.sleep(msg_typing_delay)
