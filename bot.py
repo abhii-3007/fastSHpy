@@ -73,15 +73,15 @@ async def on_message(message: discord.Message) -> None:
 
     # 3. Helper-bot notification & Catching Logic
     if message.author.id in HELPER_BOT_IDS and str(bot.user.id) in message.content:
-        
+
         # ---------------------------------------------------------
         # NEW: Smart 1-in-10-to-15 Miss Logic
         # ---------------------------------------------------------
         ping_counter += 1
-        
+
         if ping_counter >= next_miss_target:
             print(f"🙈 [Stealth] Simulated human error: Ignored ping #{ping_counter}.")
-            
+
             # Reset counter and pick a new target for the next miss
             ping_counter = 0
             next_miss_target = random.randint(10, 15)
@@ -107,8 +107,8 @@ async def on_message(message: discord.Message) -> None:
                 return
 
             print(f"⚙️ Processing queued catch for: {pokemon_name}")
-            
-            # Read delay (300ms - 600ms)
+
+            # Read delay (already increased via random bounds)
             read_delay = random.uniform(0.4, 0.85)
 
             # Distraction simulation
@@ -132,6 +132,7 @@ async def on_message(message: discord.Message) -> None:
             made_typo = False
             if random.random() < 0.05:
                 final_name = simulate_typo(final_name)
+                made_typo = True
                 print(f"[Stealth] Made a typo: {final_name}")
 
             # Command formatting
@@ -152,22 +153,44 @@ async def on_message(message: discord.Message) -> None:
             await message.channel.send(final_message)
             print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
 
+            # --- NEW: Typo Correction Logic ---
+            if made_typo:
+                if is_paused or is_afk:
+                    return
+                
+                # Human delay to realize the mistake (0.5 to 1.5 seconds)
+                realize_delay = random.uniform(0.5, 1.5)
+                await asyncio.sleep(realize_delay)
+
+                # Type out the correct command
+                correct_typing_delay = len(pokemon_name) * random.uniform(0.04, 0.08)
+                async with message.channel.typing():
+                    await asyncio.sleep(correct_typing_delay)
+
+                # Format and send the corrected catch command
+                correct_cmd = random.choice(["c", "catch"])
+                correct_name = pokemon_name.lower() if random.random() < 0.70 else pokemon_name
+                correct_msg = f"<@{POKETWO_BOT_ID}> {correct_cmd} {correct_name}"
+                
+                await message.channel.send(correct_msg)
+                print(f"🔧 [Stealth] Corrected typo quickly with: {correct_name}")
+
             # 30% chance to send a casual follow-up message
             if random.random() < 0.30:
                 follow_up_msgs = ["nice", "ok", "shine", "shine when", "gg", "damn", "oh", "sheesh", "crazy", "wow"]
                 chosen_msg = random.choice(follow_up_msgs)
-                
+
                 # Human delay before starting to type the follow-up (1 to 3 seconds)
                 reaction_delay = random.uniform(1.0, 3.0)
                 await asyncio.sleep(reaction_delay)
-                
+
                 if is_paused or is_afk:
                     return
 
                 msg_typing_delay = len(chosen_msg) * random.uniform(0.04, 0.08)
                 async with message.channel.typing():
                     await asyncio.sleep(msg_typing_delay)
-                
+
                 await message.channel.send(chosen_msg)
                 print(f"💬 [Stealth] Sent follow-up message: '{chosen_msg}'")
 
@@ -175,3 +198,4 @@ async def on_message(message: discord.Message) -> None:
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
