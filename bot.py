@@ -153,7 +153,7 @@ async def on_message(message: discord.Message) -> None:
 
             # 30% chance to send a casual follow-up message
             if random.random() < 0.30:
-                follow_up_msgs = ["nice", "ok", "shine", "shine when", "gg"]
+                follow_up_msgs = ["nice", "ok", "shine", "shine when", "gg", "damn", "oh", "sheesh", "crazy", "wow"]
                 chosen_msg = random.choice(follow_up_msgs)
                 
                 # Human delay before starting to type the follow-up (1 to 3 seconds)
