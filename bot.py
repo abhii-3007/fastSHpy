@@ -129,6 +129,7 @@ async def on_message(message: discord.Message) -> None:
 
             # Typo generation
             final_name = pokemon_name
+            made_typo = False
             if random.random() < 0.05:
                 final_name = simulate_typo(final_name)
                 print(f"[Stealth] Made a typo: {final_name}")
