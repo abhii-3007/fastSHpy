@@ -14,16 +14,21 @@ catch_queue = CatchQueue()
 is_paused = False
 is_afk = False
 
-# --- NEW: Smart Miss Counter Variables ---
+# --- Smart Miss Counter Variables ---
 ping_counter = 0
 next_miss_target = random.randint(10, 15)
 
 async def afk_timer(afk_seconds: int) -> None:
     global is_afk
-    print(f"🚶 [Stealth] Taking a bathroom break. AFK for {int(afk_seconds / 60)} minutes.")
+    minutes = afk_seconds // 60
+    seconds = afk_seconds % 60
+    print(f"🚶 [Stealth] Taking a bathroom break. AFK for {minutes} minutes and {seconds} seconds.")
+    
     await asyncio.sleep(afk_seconds)
-    is_afk = False
-    print("🔙 [Stealth] Back at the keyboard.")
+    
+    # This line automatically resumes the bot when the timer finishes
+    is_afk = False 
+    print("🔙 [Stealth] Back at the keyboard. Resuming auto-catch automatically!")
 
 @bot.event
 async def on_ready() -> None:
@@ -59,7 +64,7 @@ async def on_message(message: discord.Message) -> None:
         print("⚠️ Captcha detected targeting YOUR account. Script paused.")
         return
 
-    # --- UPDATED: Shiny Catch Sequence ---
+    # --- Shiny Catch Sequence ---
     if (
         message.author.id == POKETWO_BOT_ID
         and "These colors seem unusual..." in message.content
@@ -102,7 +107,7 @@ async def on_message(message: discord.Message) -> None:
     if message.author.id in HELPER_BOT_IDS and str(bot.user.id) in message.content:
 
         # ---------------------------------------------------------
-        # NEW: Smart 1-in-10-to-15 Miss Logic
+        # Smart 1-in-10-to-15 Miss Logic
         # ---------------------------------------------------------
         ping_counter += 1
 
@@ -115,10 +120,10 @@ async def on_message(message: discord.Message) -> None:
             print(f"🎯 [Stealth] Next forced miss is scheduled in {next_miss_target} pings.")
             return
 
-        # 2% chance to go AFK for 10-20 minutes
+        # 2% chance to go AFK for 3-5 minutes
         if random.random() < 0.02:
             is_afk = True
-            afk_seconds = random.randint(600, 1200) # 10 to 20 minutes
+            afk_seconds = random.randint(180, 300) # 180s to 300s (3 to 5 minutes)
             bot.loop.create_task(afk_timer(afk_seconds))
             return
 
@@ -180,7 +185,7 @@ async def on_message(message: discord.Message) -> None:
             await message.channel.send(final_message)
             print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
 
-            # --- NEW: Typo Correction Logic ---
+            # --- Typo Correction Logic ---
             if made_typo:
                 if is_paused or is_afk:
                     return
