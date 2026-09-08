@@ -76,23 +76,23 @@ async def on_message(message: discord.Message) -> None:
         async def shiny_reaction_sequence():
             # 1. Random reaction
             reaction = random.choice(["YOOOOOO", "finallyyy", "damnnn", "yayyaya"])
-            await asyncio.sleep(random.uniform(0.8, 1.5)) # Initial realization delay
+            await asyncio.sleep(random.uniform(1.6, 3.0)) # Initial realization delay (DOUBLED)
             async with message.channel.typing():
-                await asyncio.sleep(len(reaction) * random.uniform(0.04, 0.08))
+                await asyncio.sleep(len(reaction) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
             await message.channel.send(reaction)
 
             # 2. First follow-up ping
             ping_msg = "<@716390085896962058> i l"
-            await asyncio.sleep(random.uniform(1.2, 2.5)) # Delay between messages
+            await asyncio.sleep(random.uniform(2.4, 5.0)) # Delay between messages (DOUBLED)
             async with message.channel.typing():
-                await asyncio.sleep(len(ping_msg) * random.uniform(0.04, 0.08))
+                await asyncio.sleep(len(ping_msg) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
             await message.channel.send(ping_msg)
 
             # 3. Final tyty! message
             final_msg = "tyty!"
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            await asyncio.sleep(random.uniform(2.0, 4.0)) # Delay between messages (DOUBLED)
             async with message.channel.typing():
-                await asyncio.sleep(len(final_msg) * random.uniform(0.04, 0.08))
+                await asyncio.sleep(len(final_msg) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
             await message.channel.send(final_msg)
 
         # Run the sequence without blocking the main event loop
