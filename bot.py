@@ -141,7 +141,7 @@ async def on_message(message: discord.Message) -> None:
             print(f"⚙️ Processing queued catch for: {pokemon_name}")
 
             # Read delay (already increased via random bounds)
-            read_delay = random.uniform(0.4, 0.85)
+            read_delay = random.uniform(0.5, 0.98)
 
             # Distraction simulation
             if random.random() < 0.10:
