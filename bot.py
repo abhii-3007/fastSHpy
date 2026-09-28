@@ -120,8 +120,8 @@ async def on_message(message: discord.Message) -> None:
             print(f"🎯 [Stealth] Next forced miss is scheduled in {next_miss_target} pings.")
             return
 
-        # 2% chance to go AFK for 3-5 minutes
-        if random.random() < 0.02:
+        # 🔥 REDUCED FREQUENCY: 0.2% chance (1-in-500) to go AFK for 3-5 minutes
+        if random.random() < 0.002:
             is_afk = True
             afk_seconds = random.randint(180, 300) # 180s to 300s (3 to 5 minutes)
             bot.loop.create_task(afk_timer(afk_seconds))
