@@ -11,8 +11,15 @@ from services.stealth import simulate_typo
 bot = discord.Client()
 catch_queue = CatchQueue()
 
+# --- Global State & Locks ---
 is_paused = False
 is_afk = False
+
+# This lock ensures the bot can never type/send two different messages at the exact same time
+bot_action_lock = asyncio.Lock() 
+
+# Tracks how many pokemon are currently queued or being caught
+pending_catches = 0 
 
 # --- Smart Miss Counter Variables ---
 ping_counter = 0
@@ -26,7 +33,6 @@ async def afk_timer(afk_seconds: int) -> None:
     
     await asyncio.sleep(afk_seconds)
     
-    # This line automatically resumes the bot when the timer finishes
     is_afk = False 
     print("🔙 [Stealth] Back at the keyboard. Resuming auto-catch automatically!")
 
@@ -38,11 +44,11 @@ async def on_ready() -> None:
 @bot.event
 async def on_message(message: discord.Message) -> None:
     global is_paused, is_afk
-    global ping_counter, next_miss_target
+    global ping_counter, next_miss_target, pending_catches
 
     msg_content = message.content.strip().lower()
 
-    # 1. Handle own commands (User Bot Command Routing)
+    # 1. Handle own commands
     if message.author.id == bot.user.id:
         if msg_content == "!pause":
             is_paused = True
@@ -52,9 +58,9 @@ async def on_message(message: discord.Message) -> None:
             is_paused = False
             print("▶️ Bot manually resumed.")
             return
-        return # Ignore all other messages sent by our own account
+        return 
 
-    # 2. Safety conditions
+    # 2. Safety conditions (Captcha)
     if (
         message.author.id == POKETWO_BOT_ID
         and "Please tell us you're human!" in message.content
@@ -74,28 +80,25 @@ async def on_message(message: discord.Message) -> None:
         print("✨ Shiny caught - script paused. Initiating reaction sequence.")
 
         async def shiny_reaction_sequence():
-            # 1. Random reaction
-            reaction = random.choice(["YOOOOOO", "finallyyy", "damnnn", "yayyaya"])
-            await asyncio.sleep(random.uniform(1.6, 3.0)) # Initial realization delay (DOUBLED)
-            async with message.channel.typing():
-                await asyncio.sleep(len(reaction) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
-            await message.channel.send(reaction)
+            async with bot_action_lock:
+                reaction = random.choice(["YOOOOOO", "finallyyy", "damnnn", "yayyaya"])
+                await asyncio.sleep(random.uniform(1.6, 3.0)) 
+                async with message.channel.typing():
+                    await asyncio.sleep(len(reaction) * random.uniform(0.08, 0.16)) 
+                await message.channel.send(reaction)
 
-            # 2. First follow-up ping
-            ping_msg = "<@716390085896962058> i l"
-            await asyncio.sleep(random.uniform(2.4, 5.0)) # Delay between messages (DOUBLED)
-            async with message.channel.typing():
-                await asyncio.sleep(len(ping_msg) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
-            await message.channel.send(ping_msg)
+                ping_msg = "<@716390085896962058> i l"
+                await asyncio.sleep(random.uniform(2.4, 5.0)) 
+                async with message.channel.typing():
+                    await asyncio.sleep(len(ping_msg) * random.uniform(0.08, 0.16))
+                await message.channel.send(ping_msg)
 
-            # 3. Final tyty! message
-            final_msg = "tyty!"
-            await asyncio.sleep(random.uniform(2.0, 4.0)) # Delay between messages (DOUBLED)
-            async with message.channel.typing():
-                await asyncio.sleep(len(final_msg) * random.uniform(0.08, 0.16)) # Typing delay (DOUBLED)
-            await message.channel.send(final_msg)
+                final_msg = "tyty!"
+                await asyncio.sleep(random.uniform(2.0, 4.0)) 
+                async with message.channel.typing():
+                    await asyncio.sleep(len(final_msg) * random.uniform(0.08, 0.16))
+                await message.channel.send(final_msg)
 
-        # Run the sequence without blocking the main event loop
         bot.loop.create_task(shiny_reaction_sequence())
         return
     # -------------------------------------
@@ -106,125 +109,128 @@ async def on_message(message: discord.Message) -> None:
     # 3. Helper-bot notification & Catching Logic
     if message.author.id in HELPER_BOT_IDS and str(bot.user.id) in message.content:
 
-        # ---------------------------------------------------------
-        # Smart 1-in-10-to-15 Miss Logic
-        # ---------------------------------------------------------
+        # --- Smart Miss Logic ---
         ping_counter += 1
-
         if ping_counter >= next_miss_target:
             print(f"🙈 [Stealth] Simulated human error: Ignored ping #{ping_counter}.")
-
-            # Reset counter and pick a new target for the next miss
             ping_counter = 0
             next_miss_target = random.randint(10, 15)
             print(f"🎯 [Stealth] Next forced miss is scheduled in {next_miss_target} pings.")
             return
 
-        # 🔥 REDUCED FREQUENCY: 0.2% chance (1-in-500) to go AFK for 3-5 minutes
+        # --- AFK Logic ---
         if random.random() < 0.002:
             is_afk = True
-            afk_seconds = random.randint(180, 300) # 180s to 300s (3 to 5 minutes)
+            afk_seconds = random.randint(180, 300) 
             bot.loop.create_task(afk_timer(afk_seconds))
             return
 
         pokemon_name = extract_pokemon_name(message.content)
-
         if not pokemon_name:
             return
 
-        print(f"\n📥 Ping {ping_counter}/{next_miss_target} added to the queue: {pokemon_name}")
+        # Increase the queue counter right before adding it
+        pending_catches += 1
+        print(f"\n📥 Ping {ping_counter}/{next_miss_target} added to the queue: {pokemon_name} (Total Pending: {pending_catches})")
 
         async def process_notification() -> None:
-            if is_paused or is_afk:
-                return
-
-            print(f"⚙️ Processing queued catch for: {pokemon_name}")
-
-            # Read delay (already increased via random bounds)
-            read_delay = random.uniform(0.5, 0.98)
-
-            # Distraction simulation
-            if random.random() < 0.10:
-                distraction_time = random.uniform(2.0, 5.0)
-                read_delay += distraction_time
-                print(f"[Stealth] Distraction triggered. Delaying reaction by {int(distraction_time*1000)}ms")
-
-            await asyncio.sleep(read_delay)
-
-            # Typing simulation
-            ms_per_char = random.uniform(0.04, 0.08)
-            typing_delay = len(pokemon_name) * ms_per_char
-
-            # Native typing indicator in discord.py-self
-            async with message.channel.typing():
-                await asyncio.sleep(typing_delay)
-
-            # Typo generation
-            final_name = pokemon_name
-            made_typo = False
-            if random.random() < 0.05:
-                final_name = simulate_typo(final_name)
-                made_typo = True
-                print(f"[Stealth] Made a typo: {final_name}")
-
-            # Command formatting
-            cmd = random.choice(["c", "catch"])
-            if random.random() < 0.70:
-                final_name = final_name.lower()
-
-            r_space = random.random()
-            extra_space = "" if r_space < 0.03 else ("  " if r_space < 0.3 else " ")
-            final_message = f"<@{POKETWO_BOT_ID}>{extra_space}{cmd} {final_name}"
-
-            # Final safety check before executing
-            if is_paused:
-                print("🛑 Aborted sending message because script was paused mid-type.")
-                return
-
-            # Send the catch command
-            await message.channel.send(final_message)
-            print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
-
-            # --- Typo Correction Logic ---
-            if made_typo:
+            global pending_catches
+            try:
                 if is_paused or is_afk:
                     return
 
-                # Human delay to realize the mistake (0.5 to 1.5 seconds)
-                realize_delay = random.uniform(0.5, 1.5)
-                await asyncio.sleep(realize_delay)
+                print(f"⚙️ Processing queued catch for: {pokemon_name}")
 
-                # Type out the correct command
-                correct_typing_delay = len(pokemon_name) * random.uniform(0.04, 0.08)
-                async with message.channel.typing():
-                    await asyncio.sleep(correct_typing_delay)
+                # 1. Read delay
+                read_delay = random.uniform(0.5, 0.98)
+                if random.random() < 0.10:
+                    distraction_time = random.uniform(2.0, 5.0)
+                    read_delay += distraction_time
+                    print(f"[Stealth] Distraction triggered. Delaying reaction by {int(distraction_time*1000)}ms")
 
-                # Format and send the corrected catch command
-                correct_cmd = random.choice(["c", "catch"])
-                correct_name = pokemon_name.lower() if random.random() < 0.70 else pokemon_name
-                correct_msg = f"<@{POKETWO_BOT_ID}> {correct_cmd} {correct_name}"
+                await asyncio.sleep(read_delay)
 
-                await message.channel.send(correct_msg)
-                print(f"🔧 [Stealth] Corrected typo quickly with: {correct_name}")
+                # 2. Start Typing / Catching
+                async with bot_action_lock:
+                    if is_paused or is_afk: return
 
-            # 30% chance to send a casual follow-up message
-            if random.random() < 0.30:
-                follow_up_msgs = ["ok", "shine", "<@716390085896962058> i l", "hmm", "<@716390085896962058> sh", "damn", "oh", "sheesh", "wow", "ggs"]
-                chosen_msg = random.choice(follow_up_msgs)
+                    ms_per_char = random.uniform(0.04, 0.08)
+                    typing_delay = len(pokemon_name) * ms_per_char
 
-                # Human delay before starting to type the follow-up (1 to 3 seconds)
-                reaction_delay = random.uniform(1.0, 3.0)
-                await asyncio.sleep(reaction_delay)
+                    async with message.channel.typing():
+                        await asyncio.sleep(typing_delay)
 
-                if is_paused or is_afk:
-                    return
+                    final_name = pokemon_name
+                    made_typo = False
+                    if random.random() < 0.05:
+                        final_name = simulate_typo(final_name)
+                        made_typo = True
+                        print(f"[Stealth] Made a typo: {final_name}")
 
-                msg_typing_delay = len(chosen_msg) * random.uniform(0.04, 0.08)
-                async with message.channel.typing():
-                    await asyncio.sleep(msg_typing_delay)
+                    cmd = random.choice(["c", "catch"])
+                    if random.random() < 0.70:
+                        final_name = final_name.lower()
 
-                await message.channel.send(chosen_msg)
-                print(f"💬 [Stealth] Sent follow-up message: '{chosen_msg}'")
+                    r_space = random.random()
+                    extra_space = "" if r_space < 0.03 else ("  " if r_space < 0.3 else " ")
+                    final_message = f"<@{POKETWO_BOT_ID}>{extra_space}{cmd} {final_name}"
+
+                    await message.channel.send(final_message)
+                    print(f"🏓 Caught: {final_name} (Read: {int(read_delay*1000)}ms | Typed: {int(typing_delay*1000)}ms)")
+
+                # 3. Typo Correction (if applicable)
+                if made_typo:
+                    realize_delay = random.uniform(0.5, 1.5)
+                    await asyncio.sleep(realize_delay)
+
+                    async with bot_action_lock:
+                        if is_paused or is_afk: return
+
+                        correct_typing_delay = len(pokemon_name) * random.uniform(0.04, 0.08)
+                        async with message.channel.typing():
+                            await asyncio.sleep(correct_typing_delay)
+
+                        correct_cmd = random.choice(["c", "catch"])
+                        correct_name = pokemon_name.lower() if random.random() < 0.70 else pokemon_name
+                        correct_msg = f"<@{POKETWO_BOT_ID}> {correct_cmd} {correct_name}"
+
+                        await message.channel.send(correct_msg)
+                        print(f"🔧 [Stealth] Corrected typo quickly with: {correct_name}")
+
+                # 4. Late Follow-up Message (Runs as a background task)
+                if random.random() < 0.30:
+                    async def delayed_follow_up():
+                        late_delay = random.uniform(6.0, 14.0)
+                        await asyncio.sleep(late_delay)
+
+                        # Check if a new ping arrived while we were waiting
+                        if pending_catches > 0:
+                            print("🚫 [Stealth] Cancelled follow-up: Priority catch in queue.")
+                            return
+
+                        if is_paused or is_afk:
+                            return
+
+                        follow_up_msgs = ["ok", "shine", "<@716390085896962058> i l", "hmm", "<@716390085896962058> sh", "damn", "oh", "sheesh", "wow", "ggs"]
+                        chosen_msg = random.choice(follow_up_msgs)
+                        msg_typing_delay = len(chosen_msg) * random.uniform(0.04, 0.08)
+
+                        # Grab the lock and check one last time before typing
+                        async with bot_action_lock:
+                            if is_paused or is_afk or pending_catches > 0: 
+                                return
+                            
+                            async with message.channel.typing():
+                                await asyncio.sleep(msg_typing_delay)
+
+                            await message.channel.send(chosen_msg)
+                            print(f"💬 [Stealth] Sent late follow-up message: '{chosen_msg}'")
+
+                    bot.loop.create_task(delayed_follow_up())
+
+            finally:
+                # The catch sequence for this ping is fully done. Lower the counter.
+                pending_catches -= 1
 
         await catch_queue.add(process_notification)
 
